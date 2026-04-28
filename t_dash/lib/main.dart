@@ -123,56 +123,72 @@ class _SpeedPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 330),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0x335DA0FF)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x2238D996),
-                blurRadius: 48,
-                spreadRadius: 4,
-              ),
-            ],
-            gradient: const RadialGradient(
-              colors: [Color(0xFF0A0E14), Color(0xFF111A24)],
-            ),
-          ),
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _PillLabel(text: 'GPS'),
-                  SizedBox(width: 8),
-                  _PillLabel(text: '停车'),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final shortestSide = constraints.biggest.shortestSide;
+          final diameter = (shortestSide.isFinite ? shortestSide : 330.0).clamp(
+            0.0,
+            330.0,
+          );
+
+          return SizedBox.square(
+            dimension: diameter,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0x335DA0FF)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x2238D996),
+                    blurRadius: 48,
+                    spreadRadius: 4,
+                  ),
                 ],
-              ),
-              SizedBox(height: 12),
-              Text(
-                '0',
-                style: TextStyle(
-                  fontSize: 112,
-                  height: 0.9,
-                  fontWeight: FontWeight.w900,
+                gradient: const RadialGradient(
+                  colors: [Color(0xFF0A0E14), Color(0xFF111A24)],
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
-                'km/h',
-                style: TextStyle(
-                  color: Color(0xFF9AA5B3),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+              child: const Padding(
+                padding: EdgeInsets.all(28),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _PillLabel(text: 'GPS'),
+                          SizedBox(width: 8),
+                          _PillLabel(text: '停车'),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        '0',
+                        style: TextStyle(
+                          fontSize: 112,
+                          height: 0.9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'km/h',
+                        style: TextStyle(
+                          color: Color(0xFF9AA5B3),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

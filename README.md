@@ -86,7 +86,16 @@ Flutter 工程位于：
 t_dash/
 ```
 
-当前仓库使用项目本地 Flutter SDK，路径为 `.toolchains/flutter`，不会提交到 Git。运行 Flutter 命令前可使用下面的环境变量：
+当前仓库可以使用系统全局 `flutter`，也可以使用项目本地 Flutter SDK。项目本地 SDK 的路径约定为 `.toolchains/flutter`，该目录不会提交到 Git。
+
+如果本机没有 Flutter，可在项目根目录初始化本地 SDK：
+
+```bash
+mkdir -p .toolchains
+git clone --depth 1 -b stable https://github.com/flutter/flutter.git .toolchains/flutter
+```
+
+如果系统没有 `unzip`，仓库提供了一个 Python 版兼容 wrapper：`tools/bin/unzip`。运行 Flutter 命令前可使用下面的环境变量：
 
 ```bash
 export TMPDIR=/tmp
