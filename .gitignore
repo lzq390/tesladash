@@ -1,0 +1,19 @@
+.codex
+.DS_Store
+Thumbs.db
+
+# Web / JS scratch space
+node_modules/
+dist/
+coverage/
+
+# Flutter / Dart generated files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# IDE
+.idea/
+.vscode/
