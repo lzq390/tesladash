@@ -1,0 +1,10 @@
+{
+  "name": "T-Dash Prototype",
+  "short_name": "T-Dash",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070a0f",
+  "theme_color": "#070a0f",
+  "orientation": "any",
+  "icons": []
+}

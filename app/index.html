@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#070a0f" />
+    <title>T-Dash Prototype</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="T-Dash 仪表盘原型">
+      <section class="dashboard">
+        <header class="topbar">
+          <button class="icon-button" id="menuButton" type="button" aria-label="菜单">
+            <span></span>
+            <span></span>
+          </button>
+          <div>
+            <p class="vehicle-name">Model 3</p>
+            <p class="connection" id="connectionText">BLE 已连接</p>
+          </div>
+          <div class="battery-pill">
+            <span id="batteryTop">86%</span>
+            <i></i>
+          </div>
+        </header>
+
+        <section class="speed-panel" aria-label="车速">
+          <div class="speed-ring">
+            <div class="speed-meta">
+              <span id="speedSource">GPS</span>
+              <span id="driveModeLabel">停车</span>
+            </div>
+            <strong id="speedValue">0</strong>
+            <small>km/h</small>
+          </div>
+        </section>
+
+        <section class="energy-panel" aria-label="电量与续航">
+          <div class="battery-track">
+            <div class="battery-fill" id="batteryFill"></div>
+          </div>
+          <div class="energy-row">
+            <span><b id="batteryPercent">86%</b> 电量</span>
+            <span><b id="rangeValue">412</b> km 续航</span>
+          </div>
+        </section>
+
+        <section class="vehicle-visual" aria-label="车辆状态示意">
+          <img src="./assets/car-top.svg" alt="" />
+          <div class="visual-state visual-state-left" id="lockState">已上锁</div>
+          <div class="visual-state visual-state-right" id="doorState">门窗关闭</div>
+        </section>
+
+        <section class="status-grid" aria-label="状态概览">
+          <article class="status-card">
+            <span class="card-icon climate-icon"></span>
+            <div>
+              <p>空调</p>
+              <strong id="climateStatus">待机 22°C</strong>
+            </div>
+          </article>
+          <article class="status-card">
+            <span class="card-icon tire-icon"></span>
+            <div>
+              <p>胎压</p>
+              <strong id="tireStatus">2.8 / 2.8</strong>
+            </div>
+          </article>
+          <article class="status-card">
+            <span class="card-icon charge-icon"></span>
+            <div>
+              <p>充电</p>
+              <strong id="chargeStatus">未连接</strong>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <nav class="controls" aria-label="车辆快捷控制">
+        <button class="control-button" id="driveToggle" type="button">
+          <span class="control-icon drive-icon"></span>
+          <span id="driveToggleText">模拟行驶</span>
+        </button>
+        <button class="control-button" data-action="lock" type="button">
+          <span class="control-icon lock-icon"></span>
+          <span id="lockButtonText">解锁</span>
+        </button>
+        <button class="control-button" data-action="climate" type="button">
+          <span class="control-icon fan-icon"></span>
+          <span id="climateButtonText">开空调</span>
+        </button>
+        <button class="control-button" data-action="flash" type="button">
+          <span class="control-icon flash-icon"></span>
+          <span>闪灯</span>
+        </button>
+      </nav>
+
+      <aside class="toast" id="toast" role="status"></aside>
+    </main>
+
+    <script src="./main.js"></script>
+  </body>
+</html>
