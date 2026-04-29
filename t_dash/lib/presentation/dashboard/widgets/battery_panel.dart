@@ -25,39 +25,45 @@ class BatteryPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: TDashSpacing.lg),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            runSpacing: TDashSpacing.xs,
+            spacing: TDashSpacing.xl,
             children: [
-              Row(
-                children: [
-                  Text(
-                    snapshot.batteryLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: TDashSizes.bodyStrongFont,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const Text(' 电量'),
-                ],
-              ),
-              Row(
-                children: [
-                  Text(
-                    snapshot.rangeKm.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: TDashSizes.bodyStrongFont,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const Text(' km 续航'),
-                ],
-              ),
+              _BatteryMetric(value: snapshot.batteryLabel, unit: '电量'),
+              _BatteryMetric(value: snapshot.rangeKm.toString(), unit: 'km 续航'),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BatteryMetric extends StatelessWidget {
+  const _BatteryMetric({required this.value, required this.unit});
+
+  final String value;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: TDashSizes.bodyStrongFont,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          TextSpan(text: ' $unit'),
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

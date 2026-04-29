@@ -19,6 +19,19 @@ const _stressSnapshot = DashboardSnapshot(
   chargingLabel: '未连接',
 );
 
+const _longStatusSnapshot = DashboardSnapshot(
+  vehicleName: 'Model 3 Performance',
+  connectionLabel: 'BLE 已连接',
+  batteryPercent: 100,
+  rangeKm: 512,
+  speedKmh: 188,
+  speedSourceLabel: 'GPS+IMU',
+  drivingLabel: '行驶中',
+  climateLabel: '正在制冷 18°C 自动风量',
+  tirePressureLabel: '胎压数据暂不可用',
+  chargingLabel: '正在充电 48A 预估 35 分钟',
+);
+
 Widget _buildApp({String initialLocation = '/', DashboardSnapshot? snapshot}) {
   final overrides = [
     appRouterProvider.overrideWithValue(
@@ -28,6 +41,12 @@ Widget _buildApp({String initialLocation = '/', DashboardSnapshot? snapshot}) {
   ];
 
   return ProviderScope(overrides: overrides, child: const TDashApp());
+}
+
+Finder _richTextContaining(String value) {
+  return find.byWidgetPredicate(
+    (widget) => widget is RichText && widget.text.toPlainText().contains(value),
+  );
 }
 
 Future<void> _pumpDashboardAtSize(
@@ -52,8 +71,9 @@ void main() {
     expect(find.text('BLE 已连接'), findsOneWidget);
     expect(find.text('0'), findsOneWidget);
     expect(find.text('km/h'), findsOneWidget);
-    expect(find.text('86%'), findsNWidgets(2));
-    expect(find.text('412'), findsOneWidget);
+    expect(find.text('86%'), findsOneWidget);
+    expect(_richTextContaining('电量'), findsOneWidget);
+    expect(_richTextContaining('412'), findsOneWidget);
     expect(find.text('模拟行驶'), findsOneWidget);
     expect(find.text('解锁'), findsOneWidget);
     expect(find.text('空调'), findsWidgets);
@@ -107,5 +127,22 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('188'), findsOneWidget);
     expect(find.text('模拟行驶'), findsOneWidget);
+  });
+
+  testWidgets('status cards tolerate long text with larger font scale', (
+    WidgetTester tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await _pumpDashboardAtSize(
+      tester,
+      const Size(360, 640),
+      snapshot: _longStatusSnapshot,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('正在制冷 18°C 自动风量'), findsOneWidget);
+    expect(find.text('正在充电 48A 预估 35 分钟'), findsOneWidget);
   });
 }

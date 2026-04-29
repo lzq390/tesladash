@@ -4,7 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../presentation/dashboard/dashboard_screen.dart';
 
-final appRouterProvider = Provider<GoRouter>((ref) => createAppRouter());
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final router = createAppRouter();
+  ref.onDispose(router.dispose);
+  return router;
+});
 
 GoRouter createAppRouter({String initialLocation = '/'}) {
   return GoRouter(

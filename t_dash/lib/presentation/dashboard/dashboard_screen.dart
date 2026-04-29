@@ -20,7 +20,8 @@ class DashboardScreen extends ConsumerWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final compact = constraints.maxHeight < 620;
+            final textScale = MediaQuery.textScalerOf(context).scale(1);
+            final compact = constraints.maxHeight < 620 || textScale > 1.2;
             final content = Column(
               children: _buildSections(
                 context: context,
