@@ -25,11 +25,6 @@ class StatusGrid extends StatelessWidget {
             label: '胎压',
             value: snapshot.tirePressureLabel,
           ),
-          StatusTile(
-            icon: Icons.electric_bolt,
-            label: '充电',
-            value: snapshot.chargingLabel,
-          ),
         ];
 
         if (!maxWidth.isFinite) {
@@ -43,7 +38,7 @@ class StatusGrid extends StatelessWidget {
           );
         }
 
-        final columnCount = maxWidth < 430 ? 2 : 3;
+        final columnCount = maxWidth < 430 ? 1 : 2;
         final spacing = TDashSpacing.lg;
         final tileWidth =
             (maxWidth - (spacing * (columnCount - 1))) / columnCount;

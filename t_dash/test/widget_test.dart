@@ -16,7 +16,6 @@ const _stressSnapshot = DashboardSnapshot(
   drivingLabel: '行驶中',
   climateLabel: '制冷 18°C',
   tirePressureLabel: '2.8 / 2.8',
-  chargingLabel: '未连接',
 );
 
 const _longStatusSnapshot = DashboardSnapshot(
@@ -29,7 +28,6 @@ const _longStatusSnapshot = DashboardSnapshot(
   drivingLabel: '行驶中',
   climateLabel: '正在制冷 18°C 自动风量',
   tirePressureLabel: '胎压数据暂不可用',
-  chargingLabel: '正在充电 48A 预估 35 分钟',
 );
 
 Widget _buildApp({String initialLocation = '/', DashboardSnapshot? snapshot}) {
@@ -78,6 +76,8 @@ void main() {
     expect(find.text('解锁'), findsOneWidget);
     expect(find.text('空调'), findsWidgets);
     expect(find.text('闪灯'), findsOneWidget);
+    expect(find.text('充电'), findsNothing);
+    expect(find.text('未连接'), findsNothing);
   });
 
   testWidgets('menu shows placeholder feedback', (WidgetTester tester) async {
@@ -143,6 +143,6 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('正在制冷 18°C 自动风量'), findsOneWidget);
-    expect(find.text('正在充电 48A 预估 35 分钟'), findsOneWidget);
+    expect(find.text('胎压数据暂不可用'), findsOneWidget);
   });
 }

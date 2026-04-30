@@ -11,7 +11,6 @@ final dashboardSnapshotProvider = Provider<DashboardSnapshot>((ref) {
     drivingLabel: '停车',
     climateLabel: '待机 22°C',
     tirePressureLabel: '2.8 / 2.8',
-    chargingLabel: '未连接',
   );
 });
 
@@ -26,7 +25,6 @@ class DashboardSnapshot {
     required this.drivingLabel,
     required this.climateLabel,
     required this.tirePressureLabel,
-    required this.chargingLabel,
   });
 
   final String vehicleName;
@@ -38,7 +36,6 @@ class DashboardSnapshot {
   final String drivingLabel;
   final String climateLabel;
   final String tirePressureLabel;
-  final String chargingLabel;
 
   String get batteryLabel => '$batteryPercent%';
   double get batteryProgress => batteryPercent.clamp(0, 100) / 100;
