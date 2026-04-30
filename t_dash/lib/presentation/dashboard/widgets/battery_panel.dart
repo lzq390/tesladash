@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/t_dash_theme.dart';
-import '../../../application/dashboard/dashboard_snapshot.dart';
+import '../../../application/dashboard/dashboard_view_model.dart';
 import 'dashboard_panel.dart';
 
 class BatteryPanel extends StatelessWidget {
-  const BatteryPanel({required this.snapshot, super.key});
+  const BatteryPanel({required this.viewModel, super.key});
 
-  final DashboardSnapshot snapshot;
+  final DashboardViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +18,7 @@ class BatteryPanel extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(TDashRadius.pill),
             child: LinearProgressIndicator(
-              value: snapshot.batteryProgress,
+              value: viewModel.batteryProgress,
               minHeight: TDashSizes.progressHeight,
               backgroundColor: TDashTheme.progressTrack,
               color: TDashTheme.primary,
@@ -30,8 +30,8 @@ class BatteryPanel extends StatelessWidget {
             runSpacing: TDashSpacing.xs,
             spacing: TDashSpacing.xl,
             children: [
-              _BatteryMetric(value: snapshot.batteryLabel, unit: '电量'),
-              _BatteryMetric(value: snapshot.rangeKm.toString(), unit: 'km 续航'),
+              _BatteryMetric(value: viewModel.batteryLabel, unit: '电量'),
+              _BatteryMetric(value: viewModel.rangeLabel, unit: 'km 续航'),
             ],
           ),
         ],

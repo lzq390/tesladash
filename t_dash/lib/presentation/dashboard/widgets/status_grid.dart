@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/t_dash_theme.dart';
-import '../../../application/dashboard/dashboard_snapshot.dart';
+import '../../../application/dashboard/dashboard_view_model.dart';
 import 'dashboard_panel.dart';
 
 class StatusGrid extends StatelessWidget {
-  const StatusGrid({required this.snapshot, super.key});
+  const StatusGrid({required this.viewModel, super.key});
 
-  final DashboardSnapshot snapshot;
+  final DashboardViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -18,12 +18,12 @@ class StatusGrid extends StatelessWidget {
           StatusTile(
             icon: Icons.air,
             label: '空调',
-            value: snapshot.climateLabel,
+            value: viewModel.climateLabel,
           ),
           StatusTile(
             icon: Icons.tire_repair,
             label: '胎压',
-            value: snapshot.tirePressureLabel,
+            value: viewModel.tirePressureLabel,
           ),
         ];
 

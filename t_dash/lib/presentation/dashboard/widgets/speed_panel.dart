@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/t_dash_theme.dart';
-import '../../../application/dashboard/dashboard_snapshot.dart';
+import '../../../application/dashboard/dashboard_view_model.dart';
 import 'pill_label.dart';
 
 class SpeedPanel extends StatelessWidget {
-  const SpeedPanel({required this.snapshot, super.key});
+  const SpeedPanel({required this.viewModel, super.key});
 
-  final DashboardSnapshot snapshot;
+  final DashboardViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +52,14 @@ class SpeedPanel extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          PillLabel(text: snapshot.speedSourceLabel),
+                          PillLabel(text: viewModel.speedSourceLabel),
                           const SizedBox(width: TDashSpacing.md),
-                          PillLabel(text: snapshot.drivingLabel),
+                          PillLabel(text: viewModel.drivingLabel),
                         ],
                       ),
                       const SizedBox(height: TDashSpacing.xl),
                       Text(
-                        snapshot.speedKmh.toString(),
+                        viewModel.speedText,
                         style: const TextStyle(
                           fontSize: TDashSizes.speedFont,
                           height: 0.9,
@@ -67,9 +67,9 @@ class SpeedPanel extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: TDashSpacing.md),
-                      const Text(
-                        'km/h',
-                        style: TextStyle(
+                      Text(
+                        viewModel.speedUnitText,
+                        style: const TextStyle(
                           color: TDashTheme.mutedText,
                           fontSize: TDashSizes.unitFont,
                           fontWeight: FontWeight.w700,

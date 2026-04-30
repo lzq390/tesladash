@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/t_dash_theme.dart';
-import '../../../application/dashboard/dashboard_snapshot.dart';
+import '../../../application/dashboard/dashboard_view_model.dart';
 
 class DashboardTopBar extends StatelessWidget {
   const DashboardTopBar({
-    required this.snapshot,
+    required this.viewModel,
     required this.onMenuTap,
     super.key,
   });
 
-  final DashboardSnapshot snapshot;
+  final DashboardViewModel viewModel;
   final VoidCallback onMenuTap;
 
   @override
@@ -28,7 +28,7 @@ class DashboardTopBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                snapshot.vehicleName,
+                viewModel.vehicleName,
                 style: const TextStyle(
                   fontSize: TDashSizes.bodyStrongFont,
                   fontWeight: FontWeight.w700,
@@ -36,7 +36,7 @@ class DashboardTopBar extends StatelessWidget {
               ),
               const SizedBox(height: TDashSpacing.xxs),
               Text(
-                snapshot.connectionLabel,
+                viewModel.connectionLabel,
                 style: const TextStyle(
                   color: TDashTheme.primary,
                   fontSize: TDashSizes.labelFont,
@@ -57,7 +57,7 @@ class DashboardTopBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(TDashRadius.pill),
           ),
           child: Text(
-            snapshot.batteryLabel,
+            viewModel.batteryLabel,
             style: const TextStyle(
               color: TDashTheme.primary,
               fontWeight: FontWeight.w800,
