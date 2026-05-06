@@ -82,6 +82,14 @@ Widget _buildApp({
     appRouterProvider.overrideWithValue(
       createAppRouter(initialLocation: initialLocation),
     ),
+    if (viewModel == null) ...[
+      vehicleDataSourceProvider.overrideWithValue(
+        MockVehicleDataProvider.initial(now: DateTime(2026)),
+      ),
+      velocitySourceProvider.overrideWithValue(
+        MockVelocityProvider.initial(now: DateTime(2026)),
+      ),
+    ],
     if (viewModel != null)
       dashboardViewModelProvider.overrideWithValue(viewModel),
   ];

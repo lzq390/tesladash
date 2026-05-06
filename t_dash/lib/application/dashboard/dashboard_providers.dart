@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/domain.dart';
+import '../vehicle/driving_mode_detector.dart';
+import '../../infrastructure/gps/gps_velocity_provider.dart';
 import '../../infrastructure/mock/mock_control_command_service.dart';
 import '../../infrastructure/mock/mock_dashboard_simulation_service.dart';
 import '../../infrastructure/mock/mock_vehicle_data_provider.dart';
 import '../../infrastructure/mock/mock_velocity_provider.dart';
+import '../../infrastructure/vehicle/unavailable_vehicle_data_provider.dart';
 import 'dashboard_simulation_service.dart';
 import 'dashboard_view_model.dart';
 
@@ -20,12 +25,26 @@ final mockVelocityProvider = Provider<MockVelocityProvider>((ref) {
   return provider;
 });
 
+final gpsVelocityProvider = Provider<GpsVelocityProvider>((ref) {
+  final provider = GpsVelocityProvider();
+  ref.onDispose(() {
+    unawaited(provider.stop());
+  });
+  return provider;
+});
+
+final unavailableVehicleDataProvider = Provider<UnavailableVehicleDataProvider>(
+  (ref) {
+    return UnavailableVehicleDataProvider();
+  },
+);
+
 final vehicleDataSourceProvider = Provider<VehicleDataProvider>((ref) {
-  return ref.watch(mockVehicleDataProvider);
+  return ref.watch(unavailableVehicleDataProvider);
 });
 
 final velocitySourceProvider = Provider<VelocityProvider>((ref) {
-  return ref.watch(mockVelocityProvider);
+  return ref.watch(gpsVelocityProvider);
 });
 
 final controlCommandServiceProvider = Provider<ControlCommandService>((ref) {
@@ -48,13 +67,38 @@ final dashboardSimulationServiceProvider =
       return null;
     });
 
+final drivingModeDetectorProvider = Provider<DrivingModeDetector>((ref) {
+  return DrivingModeDetector();
+});
+
+final detectedDrivingModeStoreProvider = Provider<DrivingModeStateStore>((ref) {
+  return DrivingModeStateStore();
+});
+
 final vehicleStateProvider = StreamProvider<VehicleState>((ref) {
   return ref.watch(vehicleDataSourceProvider).vehicleStateStream;
 });
 
-final velocitySampleProvider = StreamProvider<VelocitySample>((ref) {
-  return ref.watch(velocitySourceProvider).velocityStream;
-});
+final StreamProvider<VelocitySample> velocitySampleProvider =
+    StreamProvider<VelocitySample>((ref) async* {
+      final velocityProvider = ref.watch(velocitySourceProvider);
+      ref.onDispose(() {
+        unawaited(velocityProvider.stop());
+      });
+      await velocityProvider.start();
+      if (!ref.mounted) {
+        return;
+      }
+      await for (final sample in velocityProvider.velocityStream) {
+        if (velocityProvider is! MockVelocityProvider && ref.mounted) {
+          final drivingMode = ref
+              .read(drivingModeDetectorProvider)
+              .update(sample);
+          ref.read(detectedDrivingModeStoreProvider).state = drivingMode;
+        }
+        yield sample;
+      }
+    });
 
 final dashboardViewModelProvider = Provider<DashboardViewModel>((ref) {
   final vehicleDataSource = ref.watch(vehicleDataSourceProvider);
@@ -62,6 +106,7 @@ final dashboardViewModelProvider = Provider<DashboardViewModel>((ref) {
   final vehicleAsync = ref.watch(vehicleStateProvider);
   final velocityAsync = ref.watch(velocitySampleProvider);
   final simulationService = ref.watch(dashboardSimulationServiceProvider);
+  final detectedDrivingMode = ref.watch(detectedDrivingModeStoreProvider).state;
   final vehicle = switch (vehicleDataSource) {
     MockVehicleDataProvider mock => mock.currentState,
     _ => vehicleAsync.value,
@@ -80,7 +125,11 @@ final dashboardViewModelProvider = Provider<DashboardViewModel>((ref) {
   }
 
   return DashboardViewModel.fromDomain(
-    vehicle: vehicle,
+    vehicle: _withEffectiveDrivingMode(
+      vehicle,
+      detectedDrivingMode,
+      simulationAvailable: simulationService != null,
+    ),
     velocity: velocity,
     commandService: commandService,
     simulationAvailable: simulationService != null,
@@ -103,6 +152,7 @@ class DashboardController {
     }
 
     await simulationService.toggleDriving();
+    _ref.read(drivingModeDetectorProvider).reset();
     _ref.invalidate(vehicleStateProvider);
     _ref.invalidate(velocitySampleProvider);
     _ref.invalidate(dashboardViewModelProvider);
@@ -135,9 +185,44 @@ class DashboardController {
   VehicleState? _currentVehicleState() {
     final vehicleDataSource = _ref.read(vehicleDataSourceProvider);
     if (vehicleDataSource is MockVehicleDataProvider) {
-      return vehicleDataSource.currentState;
+      final simulationAvailable =
+          _ref.read(dashboardSimulationServiceProvider) != null;
+      return _withEffectiveDrivingMode(
+        vehicleDataSource.currentState,
+        _ref.read(detectedDrivingModeStoreProvider).state,
+        simulationAvailable: simulationAvailable,
+      );
     }
 
-    return _ref.read(vehicleStateProvider).value;
+    final vehicle = _ref.read(vehicleStateProvider).value;
+    if (vehicle == null) {
+      return null;
+    }
+
+    return _withEffectiveDrivingMode(
+      vehicle,
+      _ref.read(detectedDrivingModeStoreProvider).state,
+      simulationAvailable: false,
+    );
   }
+}
+
+class DrivingModeStateStore {
+  DrivingModeState state = const DrivingModeState(
+    active: false,
+    enteredAt: null,
+    reason: null,
+  );
+}
+
+VehicleState _withEffectiveDrivingMode(
+  VehicleState vehicle,
+  DrivingModeState detectedDrivingMode, {
+  required bool simulationAvailable,
+}) {
+  if (simulationAvailable) {
+    return vehicle;
+  }
+
+  return vehicle.copyWith(drivingMode: detectedDrivingMode);
 }

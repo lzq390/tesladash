@@ -4,20 +4,21 @@ T-Dash 是一个面向特斯拉车主的手机仪表盘 App 原型项目。当�
 
 ## 当前状态
 
-当前仓库包含两部分：
+当前仓库包含三部分：
 
 - `app/`：无需构建工具的移动端 PWA 原型，用来快速验证仪表盘布局、模拟车辆状态和驾驶模式。
+- `t_dash/`：Flutter 手机 App 主工程，当前主要开发目录。
 - `docs/`：产品、技术、UI/UX、执行规划和数据模型文档。
 
-已完成的原型能力：
+已完成的主要能力：
 
-- 手机仪表盘主界面。
-- 模拟 GPS 车速、电量、续航、锁车、空调、胎压和充电状态。
-- 模拟行驶模式。
-- 行驶中隐藏控制按钮。
-- 菜单按钮占位反馈。
-- 按钮键盘焦点态。
-- 静止状态下停止无意义的高频刷新。
+- PWA 仪表盘原型，可用于快速查看布局和交互参考。
+- Flutter App 工程骨架、路由、主题和 Dashboard 页面。
+- Domain 模型、Provider 抽象、Mock 数据源和 Dashboard ViewModel。
+- GPS 车速数据源，支持定位权限、弱信号降级和数据源标注。
+- 基于 GPS 速度的驾驶模式检测，行驶中拦截控制命令。
+- BLE 未接入前默认显示未连接车辆，不展示 Mock 的已连接车辆状态。
+- 小屏、横屏和系统字体放大下的基础布局回归测试。
 
 ## 本地查看原型
 
@@ -63,7 +64,16 @@ npx serve app
 │   ├── 02-技术架构与选型.md
 │   ├── 04-UI-UX设计原则.md
 │   ├── 05-App开发执行规划.md
-│   └── 06-数据模型与接口草案.md
+│   ├── 06-数据模型与接口草案.md
+│   └── 07-手动验证清单.md
+├── t_dash/
+│   ├── android/
+│   ├── lib/
+│   ├── test/
+│   └── pubspec.yaml
+├── tools/
+│   └── check-m0.sh
+├── AGENTS.md
 └── README.md
 ```
 
@@ -71,12 +81,11 @@ npx serve app
 
 近期开发顺序：
 
-1. 继续用 `app/` 验证仪表盘交互。
-2. 固化数据模型和 Provider 接口。
-3. 使用 `t_dash/` Flutter 工程迁移 Dashboard UI。
-4. 接入 Flutter 版 Mock Provider。
-5. 接入 GPS/IMU。
-6. 做 Tesla BLE 配对 PoC。
+1. 已完成 PWA 仪表盘原型和 Flutter Dashboard 迁移。
+2. 已完成 Domain 模型、Provider 抽象、Mock 数据闭环。
+3. 当前 M3 已接入 GPS 车速 Provider 和驾驶模式检测。
+4. 下一阶段优先做 Tesla BLE 权限、扫描、配对 PoC。
+5. 后续再做车辆状态读取、基础控制命令和真车内测。
 
 ## Flutter 工程
 
@@ -121,7 +130,7 @@ flutter analyze
 flutter test
 ```
 
-说明：当前 `flutter doctor` 可以运行，但会提示 Android SDK、Chrome、Linux 桌面工具链缺失。这些依赖用于真机/浏览器/桌面运行，不影响当前工程级 `analyze` 和 `test`。
+说明：本仓库的本地工具链已覆盖 Flutter、JDK、Android SDK command-line tools 和 Chrome for Testing。Linux 桌面工具链是可选项，手机 App 开发和 APK 构建不依赖它。
 
 ## 文档入口
 

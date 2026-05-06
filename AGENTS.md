@@ -21,8 +21,8 @@ T-Dash 是一个手机端第二仪表盘 App。v1 目标是通过手机传感器
 
 1. Flutter App 工程化与仪表盘体验。
 2. 统一数据模型和 Provider 抽象。
-3. Mock 数据闭环，先让 UI、状态、控制规则跑通。
-4. 后续接入 GPS/IMU 车速，再接 Tesla BLE 配对与状态读取。
+3. GPS 车速、驾驶模式和真实手机验证。
+4. 后续接入 Tesla BLE 配对与状态读取。
 
 暂不优先处理：
 
@@ -42,22 +42,25 @@ T-Dash 是一个手机端第二仪表盘 App。v1 目标是通过手机传感器
 
 ## 开发路线
 
-当前已完成 M0/M1 基础：
+当前已完成 M0/M1/M2 基础，并正在推进 M3：
 
 - PWA 原型可运行。
 - Flutter 工程已初始化。
-- Flutter 静态 Dashboard 已具备初始视觉。
+- Flutter Dashboard 已完成组件拆分、主题、路由和状态层接入。
+- Domain 模型、Provider 抽象、Mock 数据源和 Dashboard ViewModel 已落地。
+- GPS Velocity Provider 和驾驶模式检测已进入 M3 实现。
+- APK 默认车辆状态应保持诚实：BLE 未接入前显示未连接/未配对，不展示 Mock 已连接车辆。
 - README 已补充本地静态服务、Flutter SDK 初始化和 M0 检查方式。
 - `tools/check-m0.sh` 可用于基础验收。
 
-下一步进入 M2：
+下一步优先完成 M3 收口：
 
-1. 拆分 Flutter 目录结构。
-2. 建立 Domain 模型。
-3. 建立 Application/ViewModel 层。
-4. 建立 Mock Provider。
-5. 让 Dashboard UI 从 ViewModel 读取数据，而不是写死展示值。
-6. 为驾驶模式禁用控制、状态文案、Mock 数据变化补测试。
+1. 确认 GPS 权限、Android Manifest 和 APK 构建。
+2. 确认定位不可用、GPS 弱信号、正常 GPS 三类状态展示。
+3. 确认速度 > 5 km/h 持续 3 秒进入驾驶模式。
+4. 确认速度 < 1 km/h 持续 5 秒退出驾驶模式。
+5. 补齐 GPS Provider、驾驶模式和 Widget 回归测试。
+6. 更新手动验证清单和 README。
 
 建议目标结构：
 
@@ -83,7 +86,7 @@ t_dash/lib/
     shared/
 ```
 
-实现 M2 时优先保持小步迁移。不要一次性重写全部 UI；先把静态页面拆成可测试结构，再把写死数据替换为 ViewModel。
+继续开发时优先保持小步迁移。不要一次性重写全部 UI；真实 GPS/BLE 能力必须通过 Domain 接口进入 Application 层，再由 ViewModel 供 UI 消费。
 
 ## 架构原则
 
@@ -183,19 +186,24 @@ flutter test
 - README 静态服务命令依赖说明。
 - README 本地 Flutter SDK 初始化说明。
 - Flutter 车速圆小屏文字溢出风险。
+- Flutter 状态卡长文案和字体放大溢出风险。
+- GoRouter Provider 释放路由实例。
+- 非 Mock 数据源加载前误回退展示 Mock 状态。
+- 模拟行驶控制直接依赖 Mock Provider。
 
 ## 下一位 agent 的建议起点
 
 如果用户说“继续执行”或“开始下个任务”，优先执行：
 
-**M2-01：重构 Flutter 工程结构，并实现 Domain 模型 + Mock Dashboard ViewModel。**
+**M3 收口：GPS 车速真机验证、驾驶模式回归和 APK 验收。**
 
 建议验收：
 
-- `main.dart` 只保留启动入口。
-- Dashboard UI 移入 `presentation/dashboard/`。
-- 展示数据来自 ViewModel。
-- 有 Mock Provider 提供速度、电量、续航、连接和控制状态。
-- 行驶中控制按钮禁用或拦截。
+- Debug APK 可构建：`t_dash/build/app/outputs/flutter-apk/app-debug.apk`。
+- Android 首次启动请求前台定位权限，不请求后台定位权限。
+- 定位不可用时车速显示 `--`，来源显示 `无数据`。
+- GPS 弱信号时来源显示 `GPS 弱`。
+- GPS 正常时车速来自 `GpsVelocityProvider`。
+- 行驶中控制按钮禁用或命令被拦截。
 - `flutter analyze` 通过。
-- `flutter test` 覆盖主要 ViewModel 和 Widget 行为。
+- `flutter test` 覆盖 GPS Provider、驾驶模式、Provider 切换和 Widget 行为。

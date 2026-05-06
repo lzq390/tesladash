@@ -29,9 +29,11 @@ class DashboardViewModel {
     return DashboardViewModel(
       vehicleName: vehicle.displayName,
       connectionLabel: _connectionLabel(vehicle.connectionStatus),
-      speedText: velocity.kmh.round().toString(),
+      speedText: velocity.health == ProviderHealth.unavailable
+          ? '--'
+          : velocity.kmh.round().toString(),
       speedUnitText: 'km/h',
-      speedSourceLabel: _velocitySourceLabel(velocity.source),
+      speedSourceLabel: _velocitySourceLabel(velocity),
       drivingLabel: vehicle.drivingMode.active ? '行驶中' : '停车',
       batteryLabel: _batteryLabel(vehicle.battery),
       batteryProgress: _batteryProgress(vehicle.battery),
@@ -145,13 +147,23 @@ String _connectionLabel(VehicleConnectionStatus status) {
   };
 }
 
-String _velocitySourceLabel(VelocitySource source) {
-  return switch (source) {
+String _velocitySourceLabel(VelocitySample velocity) {
+  if (velocity.health == ProviderHealth.unavailable) {
+    return '无数据';
+  }
+
+  final sourceLabel = switch (velocity.source) {
     VelocitySource.gps => 'GPS',
     VelocitySource.fusedGpsImu => 'GPS+IMU',
     VelocitySource.canBus => 'CAN',
     VelocitySource.mock => 'Mock',
   };
+
+  if (velocity.health == ProviderHealth.degraded) {
+    return '$sourceLabel 弱';
+  }
+
+  return sourceLabel;
 }
 
 String _batteryLabel(BatteryState battery) {

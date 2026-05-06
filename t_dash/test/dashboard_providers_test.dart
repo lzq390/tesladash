@@ -9,7 +9,7 @@ import 'package:t_dash/infrastructure/mock/mock_velocity_provider.dart';
 
 void main() {
   test('dashboard controller toggles mock driving state', () async {
-    final container = ProviderContainer();
+    final container = _mockContainer();
     addTearDown(container.dispose);
 
     expect(container.read(dashboardViewModelProvider).speedText, '0');
@@ -35,7 +35,7 @@ void main() {
   test(
     'dashboard controller sends success and driving-mode blocked commands',
     () async {
-      final container = ProviderContainer();
+      final container = _mockContainer();
       addTearDown(container.dispose);
       final controller = container.read(dashboardControllerProvider);
 
@@ -94,7 +94,7 @@ void main() {
       );
 
       expect(viewModel.connectionLabel, 'BLE 已断开');
-      expect(viewModel.speedSourceLabel, 'GPS');
+      expect(viewModel.speedSourceLabel, 'GPS 弱');
       expect(viewModel.batteryLabel, '--');
       expect(viewModel.rangeLabel, '--');
       expect(viewModel.climateLabel, '空调状态未知');
@@ -117,7 +117,6 @@ void main() {
       final velocityProvider = MockVelocityProvider.initial(
         now: DateTime(2026),
       );
-      addTearDown(vehicleProvider.dispose);
       addTearDown(velocityProvider.dispose);
 
       final vehicleFuture = vehicleProvider.vehicleStateStream.firstWhere(
@@ -166,18 +165,19 @@ void main() {
   });
 
   test(
-    'external sources render their own values without mock simulation',
+    'default dashboard keeps vehicle data honest before BLE is available',
     () async {
+      final velocityProvider = _LoadedVelocityProvider();
       final container = ProviderContainer(
-        overrides: [
-          vehicleDataSourceProvider.overrideWithValue(
-            _LoadedVehicleDataProvider(),
-          ),
-          velocitySourceProvider.overrideWithValue(_LoadedVelocityProvider()),
-        ],
+        overrides: [velocitySourceProvider.overrideWithValue(velocityProvider)],
       );
       addTearDown(container.dispose);
 
+      final subscription = container.listen(
+        dashboardViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
       final vehicleSubscription = container.listen(
         vehicleStateProvider,
         (_, _) {},
@@ -188,10 +188,71 @@ void main() {
         (_, _) {},
         fireImmediately: true,
       );
+      addTearDown(subscription.close);
       addTearDown(vehicleSubscription.close);
       addTearDown(velocitySubscription.close);
       await container.pump();
+      await container.pump();
+      await container.pump();
 
+      final viewModel = container.read(dashboardViewModelProvider);
+      final controlLabels = viewModel.quickControls.map(
+        (control) => control.label,
+      );
+
+      expect(viewModel.vehicleName, '未连接车辆');
+      expect(viewModel.connectionLabel, '未配对');
+      expect(viewModel.speedText, '64');
+      expect(viewModel.speedSourceLabel, 'GPS');
+      expect(controlLabels, ['解锁', '空调', '闪灯']);
+      expect(
+        viewModel.quickControls.every((control) => !control.enabled),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'external sources render their own values without mock simulation',
+    () async {
+      final vehicleProvider = _LoadedVehicleDataProvider();
+      final velocityProvider = _LoadedVelocityProvider();
+      final container = ProviderContainer(
+        overrides: [
+          vehicleDataSourceProvider.overrideWithValue(vehicleProvider),
+          velocitySourceProvider.overrideWithValue(velocityProvider),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final subscription = container.listen(
+        dashboardViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      final vehicleSubscription = container.listen(
+        vehicleStateProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      final velocitySubscription = container.listen(
+        velocitySampleProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      addTearDown(vehicleSubscription.close);
+      addTearDown(velocitySubscription.close);
+      await container.pump();
+      await container.pump();
+      await container.pump();
+      await container.pump();
+
+      expect(
+        container.read(vehicleStateProvider).value?.displayName,
+        'Road Test',
+      );
+      expect(container.read(velocitySampleProvider).value?.kmh, 64);
       final viewModel = container.read(dashboardViewModelProvider);
       final controlLabels = viewModel.quickControls.map(
         (control) => control.label,
@@ -203,6 +264,74 @@ void main() {
       expect(viewModel.speedSourceLabel, 'GPS');
       expect(controlLabels, ['解锁', '空调', '闪灯']);
     },
+  );
+
+  test('external GPS speed enters driving mode and blocks commands', () async {
+    final start = DateTime(2026);
+    final vehicleProvider = _LoadedVehicleDataProvider();
+    final velocityProvider = _SequenceVelocityProvider([
+      _velocitySample(0, start),
+      _velocitySample(6, start),
+      _velocitySample(6, start.add(const Duration(seconds: 3))),
+    ]);
+    final container = ProviderContainer(
+      overrides: [
+        vehicleDataSourceProvider.overrideWithValue(vehicleProvider),
+        velocitySourceProvider.overrideWithValue(velocityProvider),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final subscription = container.listen(
+      dashboardViewModelProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    final velocitySubscription = container.listen(
+      velocitySampleProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    addTearDown(velocitySubscription.close);
+    await container.pump();
+    await container.pump();
+
+    await container.pump();
+    await container.pump();
+    await container.pump();
+    await container.pump();
+
+    expect(
+      container.read(detectedDrivingModeStoreProvider).state.active,
+      isTrue,
+    );
+    final viewModel = container.read(dashboardViewModelProvider);
+    expect(viewModel.drivingLabel, '行驶中');
+    expect(
+      viewModel.quickControls.every((control) => !control.enabled),
+      isTrue,
+    );
+
+    final result = await container
+        .read(dashboardControllerProvider)
+        .sendCommand(ControlCommandType.unlock);
+    expect(result.status, CommandStatus.blockedByDrivingMode);
+    expect(result.userMessage, '请停车后再操作');
+  });
+}
+
+ProviderContainer _mockContainer() {
+  final vehicleProvider = MockVehicleDataProvider.initial(now: DateTime(2026));
+  final velocityProvider = MockVelocityProvider.initial(now: DateTime(2026));
+  addTearDown(vehicleProvider.dispose);
+  addTearDown(velocityProvider.dispose);
+
+  return ProviderContainer(
+    overrides: [
+      vehicleDataSourceProvider.overrideWithValue(vehicleProvider),
+      velocitySourceProvider.overrideWithValue(velocityProvider),
+    ],
   );
 }
 
@@ -251,24 +380,48 @@ class _LoadedVehicleDataProvider extends _SilentVehicleDataProvider {
   ProviderHealth get health => ProviderHealth.healthy;
 
   @override
-  Stream<VehicleState> get vehicleStateStream => Stream.value(_state);
+  Stream<VehicleState> get vehicleStateStream async* {
+    yield _state;
+  }
 
   @override
   Future<VehicleState> refresh() async => _state;
 }
 
 class _LoadedVelocityProvider extends _SilentVelocityProvider {
-  final VelocitySample _sample = VelocitySample(
-    kmh: 64,
-    timestamp: DateTime(2026),
-    source: VelocitySource.gps,
-    confidence: 0.9,
-    health: ProviderHealth.healthy,
-  );
+  final VelocitySample _sample = _velocitySample(64, DateTime(2026));
 
   @override
   ProviderHealth get health => ProviderHealth.healthy;
 
   @override
-  Stream<VelocitySample> get velocityStream => Stream.value(_sample);
+  Stream<VelocitySample> get velocityStream async* {
+    yield _sample;
+  }
+}
+
+class _SequenceVelocityProvider extends _SilentVelocityProvider {
+  _SequenceVelocityProvider(this._samples);
+
+  final List<VelocitySample> _samples;
+
+  @override
+  ProviderHealth get health => ProviderHealth.healthy;
+
+  @override
+  Stream<VelocitySample> get velocityStream async* {
+    for (final sample in _samples) {
+      yield sample;
+    }
+  }
+}
+
+VelocitySample _velocitySample(double kmh, DateTime timestamp) {
+  return VelocitySample(
+    kmh: kmh,
+    timestamp: timestamp,
+    source: VelocitySource.gps,
+    confidence: 0.9,
+    health: ProviderHealth.healthy,
+  );
 }
