@@ -45,7 +45,7 @@ class PairingScreen extends ConsumerWidget {
               _BleDeviceTile(
                 device: device,
                 selected: device.id == viewModel.selectedDeviceId,
-                busy: viewModel.isBusy,
+                busy: viewModel.phase == PairingPhase.connecting,
                 onConnect: () async {
                   await controller.connect(device);
                 },

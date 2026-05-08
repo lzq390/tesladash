@@ -17,6 +17,8 @@ class PairingController {
   PairingViewModel _state = PairingViewModel.initial();
   StreamSubscription<BleDevice>? _scanSubscription;
   StreamSubscription<BleConnectionUpdate>? _connectionSubscription;
+  int _scanOperation = 0;
+  int _connectionOperation = 0;
 
   PairingViewModel get currentState => _state;
 
@@ -29,10 +31,15 @@ class PairingController {
     if (_state.isBusy) {
       return;
     }
+    final scanOperation = ++_scanOperation;
+    ++_connectionOperation;
     await _connectionSubscription?.cancel();
     _connectionSubscription = null;
 
     final permissionGranted = await _bleGateway.requestPermissions();
+    if (!_isCurrentScan(scanOperation)) {
+      return;
+    }
     if (!permissionGranted) {
       _emit(
         _state.copyWith(
@@ -50,6 +57,9 @@ class PairingController {
     }
 
     final status = await _bleGateway.currentStatus();
+    if (!_isCurrentScan(scanOperation)) {
+      return;
+    }
     if (status != BleAdapterStatus.ready) {
       _emitFailure(_adapterStatusMessage(status));
       return;
@@ -74,6 +84,9 @@ class PairingController {
         .scanForDevices(requireLocationServicesEnabled: false)
         .listen(
           (device) {
+            if (!_isCurrentScan(scanOperation)) {
+              return;
+            }
             if (foundDevices.any((item) => item.id == device.id)) {
               return;
             }
@@ -87,14 +100,23 @@ class PairingController {
             );
           },
           onError: (Object error) {
+            if (!_isCurrentScan(scanOperation)) {
+              return;
+            }
             _emitFailure(error.toString());
           },
         );
 
     await Future<void>.delayed(_scanDuration);
+    if (!_isCurrentScan(scanOperation)) {
+      return;
+    }
     await _scanSubscription?.cancel();
     _scanSubscription = null;
 
+    if (!_isCurrentScan(scanOperation)) {
+      return;
+    }
     if (_state.phase == PairingPhase.failed ||
         _state.phase == PairingPhase.permissionRequired) {
       return;
@@ -119,6 +141,10 @@ class PairingController {
   }
 
   Future<void> connect(BleDevice device) async {
+    ++_scanOperation;
+    final connectionOperation = ++_connectionOperation;
+    await _scanSubscription?.cancel();
+    _scanSubscription = null;
     await _connectionSubscription?.cancel();
     _emit(
       _state.copyWith(
@@ -137,6 +163,9 @@ class PairingController {
         .connectToDevice(device.id)
         .listen(
           (update) {
+            if (!_isCurrentConnection(connectionOperation)) {
+              return;
+            }
             if (update.status == BleConnectionStatus.connected) {
               _emit(
                 _state.copyWith(
@@ -155,6 +184,15 @@ class PairingController {
               return;
             }
 
+            if (update.status == BleConnectionStatus.disconnected ||
+                update.status == BleConnectionStatus.disconnecting) {
+              _emitFailure('BLE 连接已断开，请重新扫描后再试。');
+              if (!completer.isCompleted) {
+                completer.complete();
+              }
+              return;
+            }
+
             if (update.status == BleConnectionStatus.failed) {
               _emitFailure(update.message ?? '连接失败，请靠近车辆后重试。');
               if (!completer.isCompleted) {
@@ -163,13 +201,20 @@ class PairingController {
             }
           },
           onError: (Object error) {
+            if (!_isCurrentConnection(connectionOperation)) {
+              return;
+            }
             _emitFailure(error.toString());
             if (!completer.isCompleted) {
               completer.complete();
             }
           },
           onDone: () {
+            if (!_isCurrentConnection(connectionOperation)) {
+              return;
+            }
             if (!completer.isCompleted) {
+              _emitFailure('BLE 连接已断开，请重新扫描后再试。');
               completer.complete();
             }
           },
@@ -178,6 +223,9 @@ class PairingController {
     await completer.future.timeout(
       const Duration(seconds: 12),
       onTimeout: () async {
+        if (!_isCurrentConnection(connectionOperation)) {
+          return;
+        }
         await _connectionSubscription?.cancel();
         _connectionSubscription = null;
         _emitFailure('连接超时，请靠近车辆后重试。');
@@ -186,6 +234,8 @@ class PairingController {
   }
 
   Future<void> cancel() async {
+    ++_scanOperation;
+    ++_connectionOperation;
     await _scanSubscription?.cancel();
     await _connectionSubscription?.cancel();
     _scanSubscription = null;
@@ -216,6 +266,14 @@ class PairingController {
         isBusy: false,
       ),
     );
+  }
+
+  bool _isCurrentScan(int operation) {
+    return operation == _scanOperation && !_viewModels.isClosed;
+  }
+
+  bool _isCurrentConnection(int operation) {
+    return operation == _connectionOperation && !_viewModels.isClosed;
   }
 }
 

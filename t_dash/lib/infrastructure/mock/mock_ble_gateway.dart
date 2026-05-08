@@ -9,6 +9,8 @@ class MockBleGateway implements BleGateway {
     this.permissionGranted = true,
     this.scanDelay = Duration.zero,
     this.connectionDelay = Duration.zero,
+    this.disconnectAfterConnected = false,
+    this.disconnectionDelay = Duration.zero,
   }) : _devices = List.of(devices ?? mockBleDevices()),
        _status = initialStatus;
 
@@ -19,6 +21,8 @@ class MockBleGateway implements BleGateway {
   bool permissionGranted;
   Duration scanDelay;
   Duration connectionDelay;
+  bool disconnectAfterConnected;
+  Duration disconnectionDelay;
 
   @override
   Stream<BleAdapterStatus> get adapterStatusStream async* {
@@ -78,6 +82,17 @@ class MockBleGateway implements BleGateway {
       message: found ? null : '未找到该蓝牙设备',
       updatedAt: DateTime.now(),
     );
+    if (found && disconnectAfterConnected) {
+      if (disconnectionDelay > Duration.zero) {
+        await Future<void>.delayed(disconnectionDelay);
+      }
+      yield BleConnectionUpdate(
+        deviceId: deviceId,
+        status: BleConnectionStatus.disconnected,
+        message: '模拟 BLE 断开',
+        updatedAt: DateTime.now(),
+      );
+    }
   }
 
   @override

@@ -214,7 +214,7 @@ void main() {
     final mockBleGateway = MockBleGateway();
     final pairingController = PairingController(
       bleGateway: mockBleGateway,
-      scanDuration: Duration.zero,
+      scanDuration: const Duration(milliseconds: 10),
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -231,22 +231,31 @@ void main() {
 
     expect(find.text('扫描车辆'), findsOneWidget);
 
-    await tester.runAsync(pairingController.startScan);
+    await tester.tap(find.text('扫描车辆'));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
     await tester.pump();
 
     expect(find.text('Tesla Model 3'), findsOneWidget);
     expect(find.text('Nearby BLE Device'), findsOneWidget);
 
+    final connectButton = find.widgetWithText(FilledButton, '连接').first;
+    await tester.ensureVisible(connectButton);
+    await tester.pump();
+    await tester.tap(connectButton);
+    await tester.pump();
     await tester.runAsync(
-      () => pairingController.connect(
-        pairingController.currentState.devices.first,
-      ),
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
     await tester.pump();
 
     expect(pairingController.currentState.title, 'BLE 已连接');
     expect(find.text('BLE 已连接'), findsOneWidget);
     expect(find.textContaining('Tesla 配对协议将在 M5 接入'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 20));
   });
 
   testWidgets('control buttons update mock state and show command feedback', (

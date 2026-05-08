@@ -32,6 +32,25 @@ void main() {
     expect(controller.currentState.primaryActionEnabled, isTrue);
   });
 
+  test('cancelled scans do not overwrite later idle state', () async {
+    final controller = PairingController(
+      bleGateway: MockBleGateway(scanDelay: const Duration(milliseconds: 50)),
+      scanDuration: const Duration(milliseconds: 10),
+    );
+    addTearDown(controller.dispose);
+
+    final scan = controller.startScan();
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+
+    expect(controller.currentState.phase, PairingPhase.scanning);
+
+    await controller.cancel();
+    expect(controller.currentState.phase, PairingPhase.idle);
+
+    await scan;
+    expect(controller.currentState.phase, PairingPhase.idle);
+  });
+
   test(
     'connects to a discovered device as BLE-only pairing placeholder',
     () async {
@@ -49,6 +68,26 @@ void main() {
       expect(controller.currentState.detail, contains('Tesla 配对协议将在 M5 接入'));
     },
   );
+
+  test('reports disconnection after a BLE connection drops', () async {
+    final controller = PairingController(
+      bleGateway: MockBleGateway(
+        disconnectAfterConnected: true,
+        disconnectionDelay: const Duration(milliseconds: 10),
+      ),
+      scanDuration: Duration.zero,
+    );
+    addTearDown(controller.dispose);
+
+    await controller.startScan();
+    await controller.connect(controller.currentState.devices.first);
+
+    expect(controller.currentState.phase, PairingPhase.waitingForVehicle);
+
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(controller.currentState.phase, PairingPhase.failed);
+    expect(controller.currentState.detail, 'BLE 连接已断开，请重新扫描后再试。');
+  });
 
   test('reports adapter unavailable state', () async {
     final controller = PairingController(
