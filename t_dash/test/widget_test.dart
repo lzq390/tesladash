@@ -1,12 +1,16 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:t_dash/app/routing/app_router.dart';
 import 'package:t_dash/app/t_dash_app.dart';
+import 'package:t_dash/application/ble/ble_providers.dart';
 import 'package:t_dash/application/dashboard/dashboard_providers.dart';
 import 'package:t_dash/application/dashboard/dashboard_view_model.dart';
+import 'package:t_dash/application/pairing/pairing_controller.dart';
+import 'package:t_dash/application/pairing/pairing_providers.dart';
 import 'package:t_dash/domain/domain.dart';
+import 'package:t_dash/infrastructure/mock/mock_ble_gateway.dart';
 import 'package:t_dash/infrastructure/mock/mock_control_command_service.dart';
 import 'package:t_dash/infrastructure/mock/mock_vehicle_data_provider.dart';
 import 'package:t_dash/infrastructure/mock/mock_velocity_provider.dart';
@@ -97,6 +101,52 @@ Widget _buildApp({
   return ProviderScope(overrides: overrides, child: const TDashApp());
 }
 
+Widget _buildPairingApp({
+  required MockBleGateway mockBleGateway,
+  required PairingController pairingController,
+}) {
+  return ProviderScope(
+    overrides: [
+      appRouterProvider.overrideWithValue(
+        createAppRouter(initialLocation: '/pairing'),
+      ),
+      bleGatewayProvider.overrideWithValue(mockBleGateway),
+      pairingControllerProvider.overrideWithValue(pairingController),
+    ],
+    child: const TDashApp(),
+  );
+}
+
+Widget _buildDashboardAppWithPairingMocks(WidgetTester tester) {
+  final mockBleGateway = MockBleGateway();
+  final pairingController = PairingController(
+    bleGateway: mockBleGateway,
+    scanDuration: Duration.zero,
+  );
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pairingController.dispose();
+    mockBleGateway.dispose();
+  });
+
+  return ProviderScope(
+    overrides: [
+      appRouterProvider.overrideWithValue(
+        createAppRouter(initialLocation: '/'),
+      ),
+      vehicleDataSourceProvider.overrideWithValue(
+        MockVehicleDataProvider.initial(now: DateTime(2026)),
+      ),
+      velocitySourceProvider.overrideWithValue(
+        MockVelocityProvider.initial(now: DateTime(2026)),
+      ),
+      bleGatewayProvider.overrideWithValue(mockBleGateway),
+      pairingControllerProvider.overrideWithValue(pairingController),
+    ],
+    child: const TDashApp(),
+  );
+}
+
 Finder _richTextContaining(String value) {
   return find.byWidgetPredicate(
     (widget) => widget is RichText && widget.text.toPlainText().contains(value),
@@ -139,13 +189,14 @@ void main() {
     expect(find.text('未连接'), findsNothing);
   });
 
-  testWidgets('menu shows placeholder feedback', (WidgetTester tester) async {
-    await tester.pumpWidget(_buildApp());
+  testWidgets('menu opens pairing route', (WidgetTester tester) async {
+    await tester.pumpWidget(_buildDashboardAppWithPairingMocks(tester));
 
     await tester.tap(find.byTooltip('菜单'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    expect(find.text('设置页开发中'), findsOneWidget);
+    expect(find.text('车辆配对'), findsOneWidget);
+    expect(find.text('扫描车辆'), findsOneWidget);
   });
 
   testWidgets('settings placeholder route is available', (
@@ -155,6 +206,47 @@ void main() {
 
     expect(find.text('设置页开发中'), findsOneWidget);
     expect(find.byTooltip('返回'), findsOneWidget);
+  });
+
+  testWidgets('pairing page scans and connects mock BLE devices', (
+    WidgetTester tester,
+  ) async {
+    final mockBleGateway = MockBleGateway();
+    final pairingController = PairingController(
+      bleGateway: mockBleGateway,
+      scanDuration: Duration.zero,
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pairingController.dispose();
+      mockBleGateway.dispose();
+    });
+
+    await tester.pumpWidget(
+      _buildPairingApp(
+        mockBleGateway: mockBleGateway,
+        pairingController: pairingController,
+      ),
+    );
+
+    expect(find.text('扫描车辆'), findsOneWidget);
+
+    await tester.runAsync(pairingController.startScan);
+    await tester.pump();
+
+    expect(find.text('Tesla Model 3'), findsOneWidget);
+    expect(find.text('Nearby BLE Device'), findsOneWidget);
+
+    await tester.runAsync(
+      () => pairingController.connect(
+        pairingController.currentState.devices.first,
+      ),
+    );
+    await tester.pump();
+
+    expect(pairingController.currentState.title, 'BLE 已连接');
+    expect(find.text('BLE 已连接'), findsOneWidget);
+    expect(find.textContaining('Tesla 配对协议将在 M5 接入'), findsOneWidget);
   });
 
   testWidgets('control buttons update mock state and show command feedback', (

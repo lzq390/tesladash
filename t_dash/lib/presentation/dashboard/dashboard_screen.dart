@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/routing/app_router.dart';
 import '../../app/theme/t_dash_theme.dart';
 import '../../application/dashboard/dashboard_providers.dart';
 import '../../application/dashboard/dashboard_view_model.dart';
@@ -61,9 +63,7 @@ class DashboardScreen extends ConsumerWidget {
     required double availableHeight,
   }) {
     void menuFeedback() {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('设置页开发中')));
+      context.goNamed(AppRoute.pairing.name);
     }
 
     Future<void> handleControl(QuickControlButtonModel control) async {

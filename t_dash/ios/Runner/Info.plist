@@ -18,6 +18,12 @@
 	<string>t_dash</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>T-Dash 需要使用蓝牙扫描并连接附近车辆。</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>T-Dash 需要使用蓝牙扫描并连接附近车辆。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>T-Dash 需要使用定位在仪表盘中显示手机 GPS 车速。</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>

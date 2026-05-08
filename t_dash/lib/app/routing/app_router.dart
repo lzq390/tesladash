@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../presentation/dashboard/dashboard_screen.dart';
+import '../../presentation/pairing/pairing_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final router = createAppRouter();
@@ -22,8 +23,7 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
       GoRoute(
         path: '/pairing',
         name: AppRoute.pairing.name,
-        builder: (context, state) =>
-            const _PlaceholderRouteScreen(title: '配对页开发中'),
+        builder: (context, state) => const PairingScreen(),
       ),
       GoRoute(
         path: '/controls',

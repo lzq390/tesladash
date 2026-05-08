@@ -22,7 +22,7 @@ T-Dash 是一个手机端第二仪表盘 App。v1 目标是通过手机传感器
 1. Flutter App 工程化与仪表盘体验。
 2. 统一数据模型和 Provider 抽象。
 3. GPS 车速、驾驶模式和真实手机验证。
-4. 后续接入 Tesla BLE 配对与状态读取。
+4. Tesla BLE 配对协议、状态读取和真实车辆验证。
 
 暂不优先处理：
 
@@ -42,25 +42,26 @@ T-Dash 是一个手机端第二仪表盘 App。v1 目标是通过手机传感器
 
 ## 开发路线
 
-当前已完成 M0/M1/M2 基础，并正在推进 M3：
+当前已完成 M0/M1/M2/M3/M4 基础：
 
 - PWA 原型可运行。
 - Flutter 工程已初始化。
 - Flutter Dashboard 已完成组件拆分、主题、路由和状态层接入。
 - Domain 模型、Provider 抽象、Mock 数据源和 Dashboard ViewModel 已落地。
-- GPS Velocity Provider 和驾驶模式检测已进入 M3 实现。
-- APK 默认车辆状态应保持诚实：BLE 未接入前显示未连接/未配对，不展示 Mock 已连接车辆。
+- GPS Velocity Provider 和驾驶模式检测已落地。
+- BLE 权限、扫描、基础连接框架和配对页状态机占位已落地。
+- APK 默认车辆状态应保持诚实：车辆状态读取未接入前显示未连接/未配对，不展示 Mock 已连接车辆。
 - README 已补充本地静态服务、Flutter SDK 初始化和 M0 检查方式。
 - `tools/check-m0.sh` 可用于基础验收。
 
-下一步优先完成 M3 收口：
+下一步优先进入 M5 配对协议 PoC：
 
-1. 确认 GPS 权限、Android Manifest 和 APK 构建。
-2. 确认定位不可用、GPS 弱信号、正常 GPS 三类状态展示。
-3. 确认速度 > 5 km/h 持续 3 秒进入驾驶模式。
-4. 确认速度 < 1 km/h 持续 5 秒退出驾驶模式。
-5. 补齐 GPS Provider、驾驶模式和 Widget 回归测试。
-6. 更新手动验证清单和 README。
+1. 阅读 Tesla `vehicle-command` 官方源码和 protobuf 定义。
+2. 确认 BLE 服务 UUID、写特征、通知特征和分片策略。
+3. 实现 P-256 本地密钥生成。
+4. 实现 Keychain / Keystore 安全存储。
+5. 实现 AddKey 配对请求和车辆响应处理。
+6. 用 Mock BLE 覆盖成功、失败、超时和重新配对状态。
 
 建议目标结构：
 
@@ -190,20 +191,20 @@ flutter test
 - GoRouter Provider 释放路由实例。
 - 非 Mock 数据源加载前误回退展示 Mock 状态。
 - 模拟行驶控制直接依赖 Mock Provider。
+- BLE/Pairing Widget 测试误触真实 BLE 插件。
+- Widget 测试直接等待 fake async 定时器导致超时。
 
 ## 下一位 agent 的建议起点
 
 如果用户说“继续执行”或“开始下个任务”，优先执行：
 
-**M3 收口：GPS 车速真机验证、驾驶模式回归和 APK 验收。**
+**M5：Tesla 配对协议 PoC、安全存储和真车配对准备。**
 
 建议验收：
 
-- Debug APK 可构建：`t_dash/build/app/outputs/flutter-apk/app-debug.apk`。
-- Android 首次启动请求前台定位权限，不请求后台定位权限。
-- 定位不可用时车速显示 `--`，来源显示 `无数据`。
-- GPS 弱信号时来源显示 `GPS 弱`。
-- GPS 正常时车速来自 `GpsVelocityProvider`。
-- 行驶中控制按钮禁用或命令被拦截。
+- 私钥通过安全存储保存，不进入日志、普通数据库或截图。
+- Mock 环境可跑通配对成功、配对失败、超时和重新配对。
+- 真车环境可至少完成一次 BLE 配对尝试。
+- 配对失败时 UI 有明确失败原因和重试入口。
 - `flutter analyze` 通过。
-- `flutter test` 覆盖 GPS Provider、驾驶模式、Provider 切换和 Widget 行为。
+- `flutter test` 覆盖密钥、配对状态机、BLE 网关和 Widget 行为。

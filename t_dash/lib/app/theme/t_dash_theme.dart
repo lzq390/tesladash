@@ -8,6 +8,8 @@ class TDashTheme {
   static const border = Color(0xFF283546);
   static const primary = Color(0xFF38D996);
   static const secondary = Color(0xFF5DA0FF);
+  static const warning = Color(0xFFFFC857);
+  static const danger = Color(0xFFFF6B6B);
   static const mutedText = Color(0xFF9AA5B3);
   static const subtleText = Color(0xFF647080);
   static const primaryTint = Color(0x1A38D996);
