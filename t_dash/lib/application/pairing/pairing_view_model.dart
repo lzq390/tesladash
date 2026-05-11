@@ -7,6 +7,7 @@ enum PairingPhase {
   devicesFound,
   connecting,
   waitingForVehicle,
+  paired,
   failed,
 }
 

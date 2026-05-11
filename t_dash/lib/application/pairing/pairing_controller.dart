@@ -1,22 +1,36 @@
 import 'dart:async';
 
 import '../../domain/domain.dart';
+import 'pairing_key_repository.dart';
 import 'pairing_view_model.dart';
 
 class PairingController {
   PairingController({
     required BleGateway bleGateway,
+    required PairingKeyRepository pairingKeyRepository,
+    required VehiclePairingService vehiclePairingService,
+    List<String> scanServiceUuids = const [],
     Duration scanDuration = const Duration(seconds: 8),
+    Duration connectionTimeout = const Duration(seconds: 12),
   }) : _bleGateway = bleGateway,
-       _scanDuration = scanDuration;
+       _pairingKeyRepository = pairingKeyRepository,
+       _vehiclePairingService = vehiclePairingService,
+       _scanServiceUuids = List.unmodifiable(scanServiceUuids),
+       _scanDuration = scanDuration,
+       _connectionTimeout = connectionTimeout;
 
   final BleGateway _bleGateway;
+  final PairingKeyRepository _pairingKeyRepository;
+  final VehiclePairingService _vehiclePairingService;
+  final List<String> _scanServiceUuids;
   final Duration _scanDuration;
+  final Duration _connectionTimeout;
   final _viewModels = StreamController<PairingViewModel>.broadcast();
 
   PairingViewModel _state = PairingViewModel.initial();
   StreamSubscription<BleDevice>? _scanSubscription;
   StreamSubscription<BleConnectionUpdate>? _connectionSubscription;
+  StreamSubscription<VehiclePairingUpdate>? _pairingSubscription;
   int _scanOperation = 0;
   int _connectionOperation = 0;
 
@@ -34,7 +48,25 @@ class PairingController {
     final scanOperation = ++_scanOperation;
     ++_connectionOperation;
     await _connectionSubscription?.cancel();
+    await _pairingSubscription?.cancel();
     _connectionSubscription = null;
+    _pairingSubscription = null;
+
+    _emit(
+      _state.copyWith(
+        phase: PairingPhase.scanning,
+        title: '正在准备配对',
+        detail: '正在准备本机 P-256 配对密钥。',
+        primaryActionLabel: '准备中',
+        primaryActionEnabled: false,
+        isBusy: true,
+        devices: [],
+        clearSelectedDevice: true,
+      ),
+    );
+    if (await _preparePairingKey(scanOperation) == null) {
+      return;
+    }
 
     final permissionGranted = await _bleGateway.requestPermissions();
     if (!_isCurrentScan(scanOperation)) {
@@ -81,7 +113,10 @@ class PairingController {
 
     await _scanSubscription?.cancel();
     _scanSubscription = _bleGateway
-        .scanForDevices(requireLocationServicesEnabled: false)
+        .scanForDevices(
+          serviceUuids: _scanServiceUuids,
+          requireLocationServicesEnabled: false,
+        )
         .listen(
           (device) {
             if (!_isCurrentScan(scanOperation)) {
@@ -131,7 +166,7 @@ class PairingController {
       _state.copyWith(
         phase: PairingPhase.devicesFound,
         title: '选择车辆',
-        detail: '选择一个附近设备建立 BLE 连接。Tesla 配对协议将在下一阶段接入。',
+        detail: '本机配对密钥已准备。选择一个附近设备建立 BLE 连接。',
         primaryActionLabel: '重新扫描',
         primaryActionEnabled: true,
         isBusy: false,
@@ -146,6 +181,28 @@ class PairingController {
     await _scanSubscription?.cancel();
     _scanSubscription = null;
     await _connectionSubscription?.cancel();
+    await _pairingSubscription?.cancel();
+    _connectionSubscription = null;
+    _pairingSubscription = null;
+    _emit(
+      _state.copyWith(
+        phase: PairingPhase.connecting,
+        title: '正在准备配对',
+        detail: '正在确认本机 P-256 配对密钥。',
+        primaryActionLabel: '准备中',
+        primaryActionEnabled: false,
+        isBusy: true,
+        selectedDeviceId: device.id,
+      ),
+    );
+    final keyMaterial = await _preparePairingKey(
+      connectionOperation,
+      forConnection: true,
+    );
+    if (keyMaterial == null) {
+      return;
+    }
+
     _emit(
       _state.copyWith(
         phase: PairingPhase.connecting,
@@ -158,79 +215,130 @@ class PairingController {
       ),
     );
 
-    final completer = Completer<void>();
+    final connectionCompleter = Completer<bool>();
+    final pairingCompleter = Completer<void>();
+    var bleConnected = false;
+
+    void completeConnection(bool connected) {
+      if (!connectionCompleter.isCompleted) {
+        connectionCompleter.complete(connected);
+      }
+    }
+
+    void completePairing() {
+      if (!pairingCompleter.isCompleted) {
+        pairingCompleter.complete();
+      }
+    }
+
+    void failCurrentConnection(String message) {
+      if (!_isCurrentConnection(connectionOperation)) {
+        return;
+      }
+      ++_connectionOperation;
+      unawaited(_pairingSubscription?.cancel());
+      _pairingSubscription = null;
+      _emitFailure(message);
+      completeConnection(false);
+      completePairing();
+    }
+
+    void finishPairingTerminal() {
+      if (!_isCurrentConnection(connectionOperation)) {
+        return;
+      }
+      ++_connectionOperation;
+      unawaited(_connectionSubscription?.cancel());
+      unawaited(_pairingSubscription?.cancel());
+      _connectionSubscription = null;
+      _pairingSubscription = null;
+      completeConnection(true);
+      completePairing();
+    }
+
+    void startVehiclePairing() {
+      unawaited(_pairingSubscription?.cancel());
+      _pairingSubscription = _vehiclePairingService
+          .requestPairing(deviceId: device.id, keyMaterial: keyMaterial)
+          .listen(
+            (update) {
+              if (!_isCurrentConnection(connectionOperation)) {
+                return;
+              }
+              _emit(_stateFromPairingUpdate(update, device.id));
+              if (!update.isBusy) {
+                finishPairingTerminal();
+              }
+            },
+            onError: (_) {
+              failCurrentConnection('配对请求执行失败，请重新扫描后再试。');
+            },
+            onDone: () {
+              if (_isCurrentConnection(connectionOperation) &&
+                  !pairingCompleter.isCompleted) {
+                failCurrentConnection('配对请求未完成，请重新扫描后再试。');
+              }
+            },
+          );
+    }
+
     _connectionSubscription = _bleGateway
-        .connectToDevice(device.id)
+        .connectToDevice(device.id, timeout: _connectionTimeout)
         .listen(
           (update) {
             if (!_isCurrentConnection(connectionOperation)) {
               return;
             }
             if (update.status == BleConnectionStatus.connected) {
-              _emit(
-                _state.copyWith(
-                  phase: PairingPhase.waitingForVehicle,
-                  title: 'BLE 已连接',
-                  detail: '基础连接已建立。车机确认和 Tesla 配对协议将在 M5 接入。',
-                  primaryActionLabel: '重新扫描',
-                  primaryActionEnabled: true,
-                  isBusy: false,
-                  selectedDeviceId: device.id,
-                ),
-              );
-              if (!completer.isCompleted) {
-                completer.complete();
+              if (bleConnected) {
+                return;
               }
+              bleConnected = true;
+              completeConnection(true);
+              startVehiclePairing();
               return;
             }
 
             if (update.status == BleConnectionStatus.disconnected ||
                 update.status == BleConnectionStatus.disconnecting) {
-              _emitFailure('BLE 连接已断开，请重新扫描后再试。');
-              if (!completer.isCompleted) {
-                completer.complete();
-              }
+              failCurrentConnection('BLE 连接已断开，请重新扫描后再试。');
               return;
             }
 
             if (update.status == BleConnectionStatus.failed) {
-              _emitFailure(update.message ?? '连接失败，请靠近车辆后重试。');
-              if (!completer.isCompleted) {
-                completer.complete();
-              }
+              failCurrentConnection(update.message ?? '连接失败，请靠近车辆后重试。');
             }
           },
           onError: (Object error) {
-            if (!_isCurrentConnection(connectionOperation)) {
-              return;
-            }
-            _emitFailure(error.toString());
-            if (!completer.isCompleted) {
-              completer.complete();
-            }
+            failCurrentConnection(error.toString());
           },
           onDone: () {
             if (!_isCurrentConnection(connectionOperation)) {
               return;
             }
-            if (!completer.isCompleted) {
-              _emitFailure('BLE 连接已断开，请重新扫描后再试。');
-              completer.complete();
+            if (!bleConnected && !connectionCompleter.isCompleted) {
+              failCurrentConnection('BLE 连接已断开，请重新扫描后再试。');
             }
           },
         );
 
-    await completer.future.timeout(
-      const Duration(seconds: 12),
+    final connected = await connectionCompleter.future.timeout(
+      _connectionTimeout,
       onTimeout: () async {
         if (!_isCurrentConnection(connectionOperation)) {
-          return;
+          return false;
         }
         await _connectionSubscription?.cancel();
         _connectionSubscription = null;
-        _emitFailure('连接超时，请靠近车辆后重试。');
+        failCurrentConnection('连接超时，请靠近车辆后重试。');
+        return false;
       },
     );
+    if (!connected) {
+      return;
+    }
+
+    await pairingCompleter.future;
   }
 
   Future<void> cancel() async {
@@ -238,8 +346,10 @@ class PairingController {
     ++_connectionOperation;
     await _scanSubscription?.cancel();
     await _connectionSubscription?.cancel();
+    await _pairingSubscription?.cancel();
     _scanSubscription = null;
     _connectionSubscription = null;
+    _pairingSubscription = null;
     _emit(PairingViewModel.initial());
   }
 
@@ -265,6 +375,53 @@ class PairingController {
         primaryActionEnabled: true,
         isBusy: false,
       ),
+    );
+  }
+
+  Future<PairingKeyMaterial?> _preparePairingKey(
+    int operation, {
+    bool forConnection = false,
+  }) async {
+    try {
+      final keyMaterial = await _pairingKeyRepository.loadOrCreate();
+      return forConnection
+          ? _isCurrentConnection(operation)
+                ? keyMaterial
+                : null
+          : _isCurrentScan(operation)
+          ? keyMaterial
+          : null;
+    } on Object {
+      final isCurrent = forConnection
+          ? _isCurrentConnection(operation)
+          : _isCurrentScan(operation);
+      if (isCurrent) {
+        _emitFailure('本地配对密钥不可用，请重试。');
+      }
+      return null;
+    }
+  }
+
+  PairingViewModel _stateFromPairingUpdate(
+    VehiclePairingUpdate update,
+    String deviceId,
+  ) {
+    final phase = switch (update.step) {
+      VehiclePairingStep.sendingAddKeyRequest => PairingPhase.connecting,
+      VehiclePairingStep.waitingForVehicleConfirmation =>
+        PairingPhase.waitingForVehicle,
+      VehiclePairingStep.paired => PairingPhase.paired,
+      VehiclePairingStep.failed => PairingPhase.failed,
+    };
+
+    return _state.copyWith(
+      phase: phase,
+      title: update.title,
+      detail: update.detail,
+      primaryActionLabel: update.isBusy ? '配对中' : '重新扫描',
+      primaryActionEnabled: !update.isBusy,
+      isBusy: update.isBusy,
+      selectedDeviceId: deviceId,
     );
   }
 

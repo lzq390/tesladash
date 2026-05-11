@@ -192,13 +192,15 @@ class _PhaseIcon extends StatelessWidget {
       PairingPhase.devicesFound => Icons.list_alt,
       PairingPhase.connecting => Icons.sync,
       PairingPhase.waitingForVehicle => Icons.check_circle,
+      PairingPhase.paired => Icons.verified,
       PairingPhase.failed => Icons.error,
     };
 
     final color = switch (phase) {
       PairingPhase.failed => TDashTheme.danger,
       PairingPhase.permissionRequired => TDashTheme.warning,
-      PairingPhase.waitingForVehicle => TDashTheme.primary,
+      PairingPhase.waitingForVehicle ||
+      PairingPhase.paired => TDashTheme.primary,
       _ => TDashTheme.secondary,
     };
 

@@ -92,7 +92,96 @@ class ReactiveBleGateway implements BleGateway {
   }
 
   @override
+  Future<void> writeCharacteristic({
+    required String deviceId,
+    required String serviceUuid,
+    required String characteristicUuid,
+    required List<int> value,
+    bool withResponse = false,
+  }) async {
+    final characteristic = _qualifiedCharacteristic(
+      deviceId: deviceId,
+      serviceUuid: serviceUuid,
+      characteristicUuid: characteristicUuid,
+    );
+    if (withResponse) {
+      await _ble.writeCharacteristicWithResponse(characteristic, value: value);
+      return;
+    }
+
+    await _ble.writeCharacteristicWithoutResponse(characteristic, value: value);
+  }
+
+  @override
+  BleCharacteristicNotifications subscribeToCharacteristic({
+    required String deviceId,
+    required String serviceUuid,
+    required String characteristicUuid,
+  }) {
+    final ready = Completer<void>();
+    StreamSubscription<List<int>>? nativeSubscription;
+    final characteristic = _qualifiedCharacteristic(
+      deviceId: deviceId,
+      serviceUuid: serviceUuid,
+      characteristicUuid: characteristicUuid,
+    );
+    late final StreamController<List<int>> controller;
+    controller = StreamController<List<int>>.broadcast(
+      onListen: () {
+        nativeSubscription = _ble
+            .subscribeToCharacteristic(characteristic)
+            .listen(
+              (data) {
+                if (!ready.isCompleted) {
+                  ready.complete();
+                }
+                controller.add(data);
+              },
+              onError: (Object error, StackTrace stackTrace) {
+                if (!ready.isCompleted) {
+                  ready.completeError(error, stackTrace);
+                }
+                controller.addError(error, stackTrace);
+              },
+              onDone: () {
+                if (!ready.isCompleted) {
+                  ready.complete();
+                }
+                controller.close();
+              },
+            );
+        scheduleMicrotask(() {
+          if (!ready.isCompleted) {
+            ready.complete();
+          }
+        });
+      },
+      onCancel: () async {
+        await nativeSubscription?.cancel();
+        nativeSubscription = null;
+      },
+    );
+
+    return BleCharacteristicNotifications(
+      stream: controller.stream,
+      ready: ready.future,
+    );
+  }
+
+  @override
   Future<void> disconnect(String deviceId) async {}
+}
+
+reactive.QualifiedCharacteristic _qualifiedCharacteristic({
+  required String deviceId,
+  required String serviceUuid,
+  required String characteristicUuid,
+}) {
+  return reactive.QualifiedCharacteristic(
+    deviceId: deviceId,
+    serviceId: reactive.Uuid.parse(serviceUuid),
+    characteristicId: reactive.Uuid.parse(characteristicUuid),
+  );
 }
 
 BleAdapterStatus _mapAdapterStatus(reactive.BleStatus status) {

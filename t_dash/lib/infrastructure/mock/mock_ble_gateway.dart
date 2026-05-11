@@ -11,11 +11,14 @@ class MockBleGateway implements BleGateway {
     this.connectionDelay = Duration.zero,
     this.disconnectAfterConnected = false,
     this.disconnectionDelay = Duration.zero,
+    this.notificationReadyDelay = Duration.zero,
   }) : _devices = List.of(devices ?? mockBleDevices()),
        _status = initialStatus;
 
   final List<BleDevice> _devices;
   final _statusController = StreamController<BleAdapterStatus>.broadcast();
+  final _notificationControllers = <String, StreamController<List<int>>>{};
+  final writtenCharacteristics = <MockBleWrite>[];
 
   BleAdapterStatus _status;
   bool permissionGranted;
@@ -23,6 +26,7 @@ class MockBleGateway implements BleGateway {
   Duration connectionDelay;
   bool disconnectAfterConnected;
   Duration disconnectionDelay;
+  Duration notificationReadyDelay;
 
   @override
   Stream<BleAdapterStatus> get adapterStatusStream async* {
@@ -98,6 +102,67 @@ class MockBleGateway implements BleGateway {
   @override
   Future<void> disconnect(String deviceId) async {}
 
+  @override
+  Future<void> writeCharacteristic({
+    required String deviceId,
+    required String serviceUuid,
+    required String characteristicUuid,
+    required List<int> value,
+    bool withResponse = false,
+  }) async {
+    writtenCharacteristics.add(
+      MockBleWrite(
+        deviceId: deviceId,
+        serviceUuid: serviceUuid,
+        characteristicUuid: characteristicUuid,
+        value: List.unmodifiable(value),
+        withResponse: withResponse,
+      ),
+    );
+  }
+
+  @override
+  BleCharacteristicNotifications subscribeToCharacteristic({
+    required String deviceId,
+    required String serviceUuid,
+    required String characteristicUuid,
+  }) {
+    return BleCharacteristicNotifications(
+      stream: _notificationController(
+        deviceId: deviceId,
+        serviceUuid: serviceUuid,
+        characteristicUuid: characteristicUuid,
+      ).stream,
+      ready: notificationReadyDelay > Duration.zero
+          ? Future<void>.delayed(notificationReadyDelay)
+          : Future<void>.value(),
+    );
+  }
+
+  StreamController<List<int>> _notificationController({
+    required String deviceId,
+    required String serviceUuid,
+    required String characteristicUuid,
+  }) {
+    return _notificationControllers.putIfAbsent(
+      '$deviceId|${serviceUuid.toLowerCase()}|${characteristicUuid.toLowerCase()}',
+      () => StreamController<List<int>>.broadcast(),
+    );
+  }
+
+  void emitNotification({
+    required String deviceId,
+    required String serviceUuid,
+    required String characteristicUuid,
+    required List<int> value,
+  }) {
+    _notificationController(
+      deviceId: deviceId,
+      serviceUuid: serviceUuid,
+      characteristicUuid: characteristicUuid,
+    ).add(List.unmodifiable(value));
+  }
+
   void updateStatus(BleAdapterStatus status) {
     _status = status;
     _statusController.add(status);
@@ -111,7 +176,27 @@ class MockBleGateway implements BleGateway {
 
   void dispose() {
     _statusController.close();
+    for (final controller in _notificationControllers.values) {
+      controller.close();
+    }
+    _notificationControllers.clear();
   }
+}
+
+class MockBleWrite {
+  const MockBleWrite({
+    required this.deviceId,
+    required this.serviceUuid,
+    required this.characteristicUuid,
+    required this.value,
+    required this.withResponse,
+  });
+
+  final String deviceId;
+  final String serviceUuid;
+  final String characteristicUuid;
+  final List<int> value;
+  final bool withResponse;
 }
 
 List<BleDevice> mockBleDevices({DateTime? now}) {
